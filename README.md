@@ -1,4 +1,56 @@
-Mini PDF Q&A App using Next.js, LangChain, Gemini (Google Generative AI), and ChromaDB.
+# Mini PDF Q&A App
+
+
+A PDF question-answering application that lets you chat with your documents using AI.
+
+## Approach
+
+**Note:** I used the Gemini API instead of the OpenAI API because OpenAI does not offer a free tier for API keys and only provides a pay-as-you-go option.
+
+
+This app uses a multi-step process to enable intelligent Q&A with PDF documents:
+
+1. **PDF Processing**: Extracts text from PDFs and splits it into manageable chunks
+2. **Embedding Generation**: Uses Gemini AI to create vector embeddings of the text chunks
+3. **Semantic Search**: Stores embeddings in ChromaDB for efficient similarity search
+4. **Question Answering**: Combines relevant chunks with Gemini AI to generate accurate answers
+
+## Quick Setup
+
+### Requirements
+- Node.js 18+
+- Google AI API key
+- MongoDB instance (for user data)
+- ChromaDB (optional, falls back to in-memory)
+
+### Install & Run
+```bash
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your credentials
+
+# Start development server
+npm run dev
+```
+
+### Environment Setup
+Create `.env.local` with these variables:
+```bash
+# Required
+GOOGLE_API_KEY=your-gemini-api-key
+MONGODB_URI=your-mongodb-uri
+JWT_SECRET=your-secret-key
+
+# Optional - ChromaDB Configuration
+CHROMA_URL=http://localhost:8000  # Local ChromaDB
+# OR for ChromaDB Cloud:
+# CHROMA_CLOUD_API_KEY=your-key
+# CHROMA_TENANT=your-tenant
+# CHROMA_DATABASE=your-database
+```
 
 ## Features
 - Upload a PDF, extract text, chunk, embed with Gemini embeddings, and store in Chroma (persisted in `data/`).
@@ -43,9 +95,39 @@ Multipart form with field `file` (PDF). Processes and persists embeddings.
 ### POST /api/ask
 JSON body `{ "question": "..." }`. Returns `{ answer }`.
 
+## API Usage
+
+All endpoints require header: `x-api-key: your-api-key`
+
+```typescript
+// Upload PDF
+POST /api/upload
+Content-Type: multipart/form-data
+Body: { file: PDF_FILE }
+
+// Ask questions
+POST /api/ask
+Content-Type: application/json
+Body: { "question": "your question here" }
+```
+
 ## Notes
-- If `CHROMA_URL` is not set, the app uses an in-memory vector store. This resets on server restart.
-- For production, secure and rotate your API key and consider auth.
+
+- Without ChromaDB configuration, the app uses in-memory storage (resets on restart)
+- For production, implement proper authentication and API key rotation
+- ChromaDB can be run locally with Docker or used via ChromaDB Cloud
+```
+pdf-parse-gpt/
+├── app/              # Next.js app router components
+├── data/             # Vector store data (configurable)
+├── lib/              # Core utilities
+├── models/           # Mongoose models
+├── pages/            # API routes and pages
+│   ├── api/         # Backend API endpoints
+│   └── ...         # Frontend pages
+├── public/          # Static assets
+└── types/           # TypeScript type definitions
+```
 
 ## Running Chroma with CORS
 To use a Chroma server, start it with CORS allowing your Next.js origin. Example:
