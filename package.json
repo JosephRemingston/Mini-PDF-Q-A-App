@@ -17,6 +17,7 @@
     "chromadb": "^1.10.5",
     "cookie": "^0.6.0",
     "formidable": "^3.5.1",
+    "framer-motion": "^12.23.12",
     "hnswlib-node": "^3.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.8.3",

@@ -2,6 +2,9 @@ import { Chroma } from "@langchain/community/vectorstores/chroma";
 import { GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { RetrievalQAChain } from "langchain/chains";
 import { getExistingMemoryStore, loadHnswIfExists } from "../../lib/vectorStore";
+import { getTokenFromReq, verifyToken } from "../../lib/auth";
+import { connectToDatabase } from "../../lib/db";
+import { Conversation } from "../../models/Conversation";
 import { CloudClient } from "chromadb";
 
 const CHROMA_URL = process.env.CHROMA_URL || "http://localhost:8000";
@@ -38,10 +41,10 @@ export default async function handler(req, res) {
           collectionName: "pdf-qa",
           index,
         });
-      } else if (CHROMA_URL) {
+      } 
+      else if (CHROMA_URL) {
         vectorStore = await Chroma.fromExistingCollection(new GoogleGenerativeAIEmbeddings({ model: "text-embedding-004", apiKey: process.env.GOOGLE_API_KEY }), {
-          collectionName: "pdf-qa",
-          url: CHROMA_URL,
+          collectionName: "pdf-qa"
         });
       } else {
         vectorStore = getExistingMemoryStore();
@@ -76,6 +79,26 @@ export default async function handler(req, res) {
       : undefined;
     const result = await chain.call({ query: chatPrefix ? `${chatPrefix} ${question}` : question });
     const answer = result?.text || result?.output_text || "";
+    // persist chat if user is authenticated
+    try {
+      const token = getTokenFromReq(req);
+      if (token) {
+        const payload = verifyToken(token);
+        await connectToDatabase();
+        const upserts = [];
+        if (Array.isArray(history) && history.length) {
+          upserts.push(...history);
+        } else {
+          upserts.push({ role: "user", content: question });
+        }
+        upserts.push({ role: "assistant", content: answer });
+        await Conversation.findOneAndUpdate(
+          { userId: payload.sub },
+          { $set: { userId: payload.sub }, $push: { messages: { $each: upserts } } },
+          { upsert: true }
+        );
+      }
+    } catch {}
     return res.status(200).json({ answer });
   } catch (error) {
     const status = error?.statusCode || 500;
