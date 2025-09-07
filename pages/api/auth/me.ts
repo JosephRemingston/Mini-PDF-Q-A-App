@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "Method Not Allowed" });
   }
-  const token = getTokenFromReq(req as any);
+  const token = getTokenFromReq(req);
   if (!token) return res.status(401).json({ error: "Unauthorized" });
   try {
     const payload = verifyToken(token);

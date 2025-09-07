@@ -59,11 +59,10 @@ export default function Home() {
   }
 
   // Upload PDF
-  async function handleUpload(e: React.FormEvent) {
+  async function handleUpload(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     // avoid bubbling that could trigger other forms
-    // @ts-ignore
-    if (typeof e.stopPropagation === "function") e.stopPropagation();
+    e.stopPropagation();
     if (!file) return;
     setLoading(true);
     try {
@@ -77,18 +76,18 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed");
       alert(`Uploaded and indexed ${data.chunks} chunks`);
-    } catch (err: any) {
-      alert(err.message || "Upload error");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Upload error";
+      alert(msg);
     } finally {
       setLoading(false);
     }
   }
 
   // Ask question
-  async function handleAsk(e: React.FormEvent) {
+  async function handleAsk(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // @ts-ignore
-    if (typeof e.stopPropagation === "function") e.stopPropagation();
+    e.stopPropagation();
     if (!question.trim()) return;
     setLoading(true);
     try {
@@ -115,9 +114,12 @@ export default function Home() {
           const data = await list.json();
           if (Array.isArray(data.conversations)) setConversations(data.conversations);
         }
-      } catch {}
-    } catch (err: any) {
-      alert(err.message || "Ask error");
+      } catch {
+        // ignore refresh errors
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Ask error";
+      alert(msg);
     } finally {
       setLoading(false);
     }

@@ -16,8 +16,6 @@ export const config = {
   },
 };
 
-const CHROMA_URL = process.env.CHROMA_URL || "http://localhost:8000";
-
 async function parseForm(req) {
   const uploadDir = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "upload-"));
   const form = formidable({ multiples: false, uploadDir, keepExtensions: true });
@@ -80,7 +78,7 @@ export default async function handler(req, res) {
           return res.status(200).json({ message: "Uploaded and indexed (local)", chunks: splitDocs.length, backend: "local" });
         }
         return res.status(200).json({ message: "Uploaded and indexed", chunks: splitDocs.length, backend: CHROMA_CLOUD_API_KEY ? "chroma-cloud" : "chroma" });
-      } catch (e) {
+      } catch {
         await saveHnswFromDocuments(splitDocs, embeddings);
         await upsertMemoryFromDocuments(splitDocs, embeddings);
         return res.status(200).json({ message: "Uploaded and indexed (local fallback)", chunks: splitDocs.length, backend: "local", note: "Chroma unreachable; used local index" });

@@ -1,20 +1,25 @@
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload, Secret, SignOptions } from "jsonwebtoken";
 import { serialize, parse } from "cookie";
+import type { NextApiRequest, NextApiResponse } from "next";
 
 const JWT_SECRET = process.env.JWT_SECRET || "";
 const COOKIE_NAME = "token";
 
-export function signToken(payload: object, expiresIn = "7d") {
+export function signToken(payload: Record<string, unknown>, expiresInSeconds: number = 60 * 60 * 24 * 7) {
   if (!JWT_SECRET) throw new Error("JWT_SECRET not set");
-  return jwt.sign(payload, JWT_SECRET, { expiresIn });
+  const secret: Secret = JWT_SECRET;
+  const options: SignOptions = { expiresIn: expiresInSeconds };
+  return jwt.sign(payload, secret, options);
 }
 
-export function verifyToken(token: string) {
+export function verifyToken(token: string): JwtPayload {
   if (!JWT_SECRET) throw new Error("JWT_SECRET not set");
-  return jwt.verify(token, JWT_SECRET) as any;
+  const payload = jwt.verify(token, JWT_SECRET);
+  if (typeof payload === "string") throw new Error("Invalid token payload");
+  return payload as JwtPayload;
 }
 
-export function setAuthCookie(res: any, token: string) {
+export function setAuthCookie(res: NextApiResponse, token: string) {
   const cookie = serialize(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
@@ -25,7 +30,7 @@ export function setAuthCookie(res: any, token: string) {
   res.setHeader("Set-Cookie", cookie);
 }
 
-export function clearAuthCookie(res: any) {
+export function clearAuthCookie(res: NextApiResponse) {
   const cookie = serialize(COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
@@ -36,7 +41,7 @@ export function clearAuthCookie(res: any) {
   res.setHeader("Set-Cookie", cookie);
 }
 
-export function getTokenFromReq(req: any): string | null {
+export function getTokenFromReq(req: NextApiRequest): string | null {
   const header = req.headers.cookie || "";
   const cookies = parse(header || "");
   return cookies[COOKIE_NAME] || null;

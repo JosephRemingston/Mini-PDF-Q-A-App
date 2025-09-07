@@ -4,12 +4,12 @@ import { Conversation } from "../../models/Conversation";
 import { getTokenFromReq, verifyToken } from "../../lib/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const token = getTokenFromReq(req as any);
+  const token = getTokenFromReq(req);
   if (!token) return res.status(401).json({ error: "Unauthorized" });
   let userId: string;
   try {
-    const payload = verifyToken(token) as any;
-    userId = payload.sub as string;
+    const payload = verifyToken(token);
+    userId = String(payload.sub);
   } catch {
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .select("title updatedAt messages")
       .slice("messages", 1)
       .lean();
-    const conversations = list.map((c: any) => ({
+    const conversations = list.map((c: { _id: any; title: string; updatedAt: Date; messages?: { content: string }[] }) => ({
       _id: c._id,
       title: c.title,
       updatedAt: c.updatedAt,

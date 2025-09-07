@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { connectToDatabase } from "../../../lib/db";
 import { User } from "../../../models/User";
 import { signToken, setAuthCookie } from "../../../lib/auth";
+import { Types } from "mongoose";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -16,8 +17,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (existing) return res.status(409).json({ error: "Email already registered" });
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await User.create({ email, passwordHash });
-  const token = signToken({ sub: user._id.toString(), email: user.email });
-  setAuthCookie(res as any, token);
+  const userId = (user._id as Types.ObjectId).toString();
+  const token = signToken({ sub: userId, email: user.email });
+  setAuthCookie(res, token);
   return res.status(201).json({ id: user._id, email: user.email });
 }
 

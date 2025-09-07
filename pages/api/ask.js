@@ -7,8 +7,6 @@ import { connectToDatabase } from "../../lib/db";
 import { Conversation } from "../../models/Conversation";
 import { CloudClient } from "chromadb";
 
-const CHROMA_URL = process.env.CHROMA_URL || "http://localhost:8000";
-
 function assertApiKey(req) {
   const headerKey = req.headers["x-api-key"]; 
   const provided = Array.isArray(headerKey) ? headerKey[0] : headerKey;
@@ -58,7 +56,7 @@ export default async function handler(req, res) {
           }
         }
       }
-    } catch (e) {
+    } catch {
       vectorStore = getExistingMemoryStore();
       if (!vectorStore) {
         const embeddings = new GoogleGenerativeAIEmbeddings({ model: "text-embedding-004", apiKey: process.env.GOOGLE_API_KEY });
