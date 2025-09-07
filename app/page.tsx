@@ -8,6 +8,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [conversations, setConversations] = useState<{ _id: string; title: string; preview?: string; updatedAt: string }[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const apiKey = process.env.NEXT_PUBLIC_API_KEY as string | undefined;
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +36,17 @@ export default function Home() {
         const res = await fetch("/api/chat", { method: "GET" });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data.messages)) setMessages(data.messages);
+          if (Array.isArray(data.conversations)) setConversations(data.conversations);
+          // auto-select most recent
+          const first = data.conversations?.[0];
+          if (first) {
+            setActiveConversationId(first._id);
+            const one = await fetch(`/api/chat?id=${first._id}`);
+            const oneData = await one.json();
+            if (Array.isArray(oneData?.conversation?.messages)) setMessages(oneData.conversation.messages);
+          } else {
+            setMessages([]);
+          }
         }
       } catch {}
     })();
@@ -86,7 +98,7 @@ export default function Home() {
           "Content-Type": "application/json",
           "x-api-key": apiKey || "",
         },
-        body: JSON.stringify({ question, history: messages }),
+        body: JSON.stringify({ question, history: messages, conversationId: activeConversationId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ask failed");
@@ -96,6 +108,14 @@ export default function Home() {
         { role: "assistant", content: data.answer || "" },
       ]);
       setQuestion("");
+      // refresh list and active conversation timestamp
+      try {
+        const list = await fetch("/api/chat");
+        if (list.ok) {
+          const data = await list.json();
+          if (Array.isArray(data.conversations)) setConversations(data.conversations);
+        }
+      } catch {}
     } catch (err: any) {
       alert(err.message || "Ask error");
     } finally {
@@ -148,8 +168,48 @@ export default function Home() {
         {/* Main panel */}
         {user && (
           <div className="flex flex-col lg:flex-row gap-6">
+            {/* Sidebar */}
+            <div className="lg:w-1/4 bg-white rounded-xl shadow-md p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-700">Your Chats</h3>
+                <button
+                  className="text-xs bg-gray-800 text-white rounded px-2 py-1"
+                  onClick={async () => {
+                    const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "New Chat", messages: [] }) });
+                    const data = await res.json();
+                    if (res.ok && data.conversation?._id) {
+                      setActiveConversationId(data.conversation._id);
+                      setMessages([]);
+                      const list = await fetch("/api/chat");
+                      const listData = await list.json();
+                      if (Array.isArray(listData.conversations)) setConversations(listData.conversations);
+                    }
+                  }}
+                >New</button>
+              </div>
+              <div className="flex-1 overflow-auto divide-y">
+                {conversations.map((c) => (
+                  <button
+                    key={c._id}
+                    className={`w-full text-left text-sm p-2 rounded ${activeConversationId === c._id ? "bg-gray-100" : "hover:bg-gray-50"}`}
+                    onClick={async () => {
+                      setActiveConversationId(c._id);
+                      const one = await fetch(`/api/chat?id=${c._id}`);
+                      const oneData = await one.json();
+                      if (Array.isArray(oneData?.conversation?.messages)) setMessages(oneData.conversation.messages);
+                    }}
+                  >
+                    <div className="truncate font-medium text-gray-800">{c.title || c.preview || "Untitled"}</div>
+                    {c.preview && (
+                      <div className="truncate text-xs text-gray-500">{c.preview}</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Upload */}
-            <div className="lg:w-1/3 bg-white rounded-xl shadow-md p-6 flex flex-col gap-4">
+            <div className="lg:w-1/4 bg-white rounded-xl shadow-md p-6 flex flex-col gap-4">
               <h2 className="text-lg font-semibold text-gray-700">Upload PDF</h2>
               <form onSubmit={handleUpload} className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
                 <input
@@ -170,7 +230,7 @@ export default function Home() {
             </div>
 
             {/* Chat */}
-            <div className="lg:w-2/3 flex flex-col bg-white rounded-xl shadow-md h-[500px] relative overflow-hidden">
+            <div className="lg:w-2/4 flex flex-col bg-white rounded-xl shadow-md h-[500px] relative overflow-hidden">
               {/* Messages */}
               <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-3 mb-20">
                 <AnimatePresence initial={false}>

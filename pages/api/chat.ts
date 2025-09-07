@@ -16,20 +16,61 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   await connectToDatabase();
 
+  // GET list conversations or one conversation by id
   if (req.method === "GET") {
-    const conv = await Conversation.findOne({ userId }).lean();
-    return res.status(200).json({ messages: conv?.messages || [] });
+    const { id } = req.query as { id?: string };
+    if (id) {
+      const conv = await Conversation.findOne({ _id: id, userId }).lean();
+      if (!conv) return res.status(404).json({ error: "Not found" });
+      return res.status(200).json({ conversation: conv });
+    }
+    const list = await Conversation.find({ userId })
+      .sort({ updatedAt: -1 })
+      .select("title updatedAt messages")
+      .slice("messages", 1)
+      .lean();
+    const conversations = list.map((c: any) => ({
+      _id: c._id,
+      title: c.title,
+      updatedAt: c.updatedAt,
+      preview: c.title && c.title !== "New Chat" ? c.title : (c.messages?.[0]?.content || "Untitled")?.slice(0, 60),
+    }));
+    return res.status(200).json({ conversations });
   }
 
+  // POST create or append
   if (req.method === "POST") {
-    const { messages } = req.body || {};
-    if (!Array.isArray(messages)) return res.status(400).json({ error: "messages must be an array" });
-    const conv = await Conversation.findOneAndUpdate(
-      { userId },
-      { $set: { userId }, $push: { messages: { $each: messages } } },
-      { upsert: true, new: true }
-    );
-    return res.status(200).json({ messages: conv.messages });
+    const { id, title, messages } = req.body || {};
+    if (id) {
+      if (!Array.isArray(messages)) return res.status(400).json({ error: "messages must be an array" });
+      const conv = await Conversation.findOneAndUpdate(
+        { _id: id, userId },
+        { $push: { messages: { $each: messages } } },
+        { new: true }
+      );
+      if (!conv) return res.status(404).json({ error: "Not found" });
+      return res.status(200).json({ conversation: conv });
+    } else {
+      const conv = await Conversation.create({ userId, title: title || "New Chat", messages: Array.isArray(messages) ? messages : [] });
+      return res.status(201).json({ conversation: conv });
+    }
+  }
+
+  // PUT rename
+  if (req.method === "PUT") {
+    const { id, title } = req.body || {};
+    if (!id || !title) return res.status(400).json({ error: "id and title required" });
+    const conv = await Conversation.findOneAndUpdate({ _id: id, userId }, { $set: { title } }, { new: true });
+    if (!conv) return res.status(404).json({ error: "Not found" });
+    return res.status(200).json({ conversation: conv });
+  }
+
+  // DELETE conversation
+  if (req.method === "DELETE") {
+    const { id } = req.query as { id?: string };
+    if (!id) return res.status(400).json({ error: "id required" });
+    await Conversation.deleteOne({ _id: id, userId });
+    return res.status(200).json({ ok: true });
   }
 
   res.setHeader("Allow", "GET, POST");

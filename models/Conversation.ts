@@ -8,6 +8,7 @@ export interface IChatMessage {
 
 export interface IConversation extends Document {
   userId: mongoose.Types.ObjectId;
+  title: string;
   messages: IChatMessage[];
   createdAt: Date;
   updatedAt: Date;
@@ -20,9 +21,12 @@ const MessageSchema = new Schema<IChatMessage>({
 });
 
 const ConversationSchema = new Schema<IConversation>({
-  userId: { type: Schema.Types.ObjectId, ref: "User", index: true, unique: true, required: true },
+  userId: { type: Schema.Types.ObjectId, ref: "User", index: true, required: true },
+  title: { type: String, default: "New Chat" },
   messages: { type: [MessageSchema], default: [] },
 }, { timestamps: true });
+
+ConversationSchema.index({ userId: 1, updatedAt: -1 });
 
 export const Conversation: Model<IConversation> = mongoose.models.Conversation || mongoose.model<IConversation>("Conversation", ConversationSchema);
 

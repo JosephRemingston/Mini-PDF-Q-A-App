@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: "Method Not Allowed" });
     }
 
-    const { question, history } = req.body || {};
+    const { question, history, conversationId } = req.body || {};
     if (!question || typeof question !== "string") {
       return res.status(400).json({ error: "Missing question" });
     }
@@ -92,11 +92,18 @@ export default async function handler(req, res) {
           upserts.push({ role: "user", content: question });
         }
         upserts.push({ role: "assistant", content: answer });
-        await Conversation.findOneAndUpdate(
-          { userId: payload.sub },
-          { $set: { userId: payload.sub }, $push: { messages: { $each: upserts } } },
-          { upsert: true }
-        );
+        if (conversationId) {
+          await Conversation.findOneAndUpdate(
+            { _id: conversationId, userId: payload.sub },
+            { $push: { messages: { $each: upserts } } }
+          );
+        } else {
+          await Conversation.findOneAndUpdate(
+            { userId: payload.sub },
+            { $setOnInsert: { title: (question || "New Chat").slice(0, 60) }, $push: { messages: { $each: upserts } } },
+            { upsert: true }
+          );
+        }
       }
     } catch {}
     return res.status(200).json({ answer });
